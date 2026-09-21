@@ -155,7 +155,7 @@ export const FindingsList: React.FC<FindingsListProps> = ({ findings = [] }) => 
 
                     {isExpanded && (
                       <tr>
-                        <td colSpan={5} style={{ background: "rgba(10, 15, 26, 0.7)", padding: 20 }}>
+                        <td colSpan={5} style={{ background: "#f1f5f9", padding: 20, borderRadius: "0 0 16px 16px" }}>
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
                             <div style={{ padding: 14, borderRadius: 8, background: "rgba(37, 99, 235, 0.03)", border: "1px solid var(--border-subtle)" }}>
                               <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--text-dim)", fontWeight: 700, marginBottom: 6 }}>
@@ -170,7 +170,7 @@ export const FindingsList: React.FC<FindingsListProps> = ({ findings = [] }) => 
                               <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "#3b82f6", fontWeight: 700, marginBottom: 6 }}>
                                 Matched Content from Source ({finding.source_name})
                               </div>
-                              <p style={{ fontSize: "0.9rem", color: "#94a3b8", lineHeight: 1.6 }}>
+                              <p style={{ fontSize: "0.9rem", color: "#334155", lineHeight: 1.6 }}>
                                 {finding.source_text || "Context matched from reference vector embeddings."}
                               </p>
                             </div>
@@ -190,7 +190,7 @@ export const FindingsList: React.FC<FindingsListProps> = ({ findings = [] }) => 
                             </div>
 
                             {finding.flag_reason && (
-                              <p style={{ fontSize: "0.875rem", color: "#e2e8f0", lineHeight: 1.6, marginBottom: 14 }}>
+                              <p style={{ fontSize: "0.875rem", color: "#334155", lineHeight: 1.6, marginBottom: 14 }}>
                                 {finding.flag_reason}
                               </p>
                             )}
@@ -200,12 +200,12 @@ export const FindingsList: React.FC<FindingsListProps> = ({ findings = [] }) => 
                               {/* TF-IDF Score */}
                               <div>
                                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                                  <span style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600 }}>Lexical (TF-IDF)</span>
+                                  <span style={{ fontSize: "0.75rem", color: "#475569", fontWeight: 600 }}>Lexical (TF-IDF)</span>
                                   <span style={{ fontSize: "0.75rem", color: "#10b981", fontWeight: 700 }}>
                                     {((finding.tfidf_score || 0) * 100).toFixed(0)}%
                                   </span>
                                 </div>
-                                <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                                <div style={{ height: 6, borderRadius: 3, background: "#e2e8f0", overflow: "hidden" }}>
                                   <div style={{
                                     height: "100%", borderRadius: 3,
                                     background: "linear-gradient(90deg, #10b981, #059669)",
@@ -218,12 +218,12 @@ export const FindingsList: React.FC<FindingsListProps> = ({ findings = [] }) => 
                               {/* Semantic Score */}
                               <div>
                                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                                  <span style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600 }}>Semantic AI</span>
+                                  <span style={{ fontSize: "0.75rem", color: "#475569", fontWeight: 600 }}>Semantic AI</span>
                                   <span style={{ fontSize: "0.75rem", color: "#3b82f6", fontWeight: 700 }}>
                                     {((finding.semantic_score || 0) * 100).toFixed(0)}%
                                   </span>
                                 </div>
-                                <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                                <div style={{ height: 6, borderRadius: 3, background: "#e2e8f0", overflow: "hidden" }}>
                                   <div style={{
                                     height: "100%", borderRadius: 3,
                                     background: "linear-gradient(90deg, #2563eb, #60a5fa)",
@@ -236,12 +236,12 @@ export const FindingsList: React.FC<FindingsListProps> = ({ findings = [] }) => 
                               {/* Combined Score */}
                               <div>
                                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                                  <span style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600 }}>Combined</span>
+                                  <span style={{ fontSize: "0.75rem", color: "#475569", fontWeight: 600 }}>Combined</span>
                                   <span style={{ fontSize: "0.75rem", color: scoreColor, fontWeight: 700 }}>
                                     {scorePercent}%
                                   </span>
                                 </div>
-                                <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                                <div style={{ height: 6, borderRadius: 3, background: "#e2e8f0", overflow: "hidden" }}>
                                   <div style={{
                                     height: "100%", borderRadius: 3,
                                     background: `linear-gradient(90deg, ${scoreColor}, ${scoreColor}88)`,

@@ -275,12 +275,12 @@ export const ResultsDashboard: React.FC = () => {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#10b981" }} />
-                      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#e2e8f0" }}>
+                      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#1e293b" }}>
                         Tier 1: Lexical (Exact Copy)
                       </span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>{t1} match{t1 !== 1 ? "es" : ""}</span>
+                      <span style={{ fontSize: "0.85rem", color: "#64748b" }}>{t1} match{t1 !== 1 ? "es" : ""}</span>
                       <span style={{
                         background: "rgba(16, 185, 129, 0.15)", color: "#10b981",
                         padding: "2px 8px", borderRadius: 12, fontSize: "0.75rem", fontWeight: 700,
@@ -289,7 +289,7 @@ export const ResultsDashboard: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  <div style={{ height: 8, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                  <div style={{ height: 8, borderRadius: 4, background: "#e2e8f0", overflow: "hidden" }}>
                     <div style={{
                       height: "100%", borderRadius: 4, background: "linear-gradient(90deg, #10b981, #059669)",
                       width: `${t1Pct}%`, transition: "width 1s ease-in-out",
@@ -302,12 +302,12 @@ export const ResultsDashboard: React.FC = () => {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#3b82f6" }} />
-                      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#e2e8f0" }}>
+                      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#1e293b" }}>
                         Tier 2: Semantic AI (Paraphrase)
                       </span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>{t2} match{t2 !== 1 ? "es" : ""}</span>
+                      <span style={{ fontSize: "0.85rem", color: "#64748b" }}>{t2} match{t2 !== 1 ? "es" : ""}</span>
                       <span style={{
                         background: "rgba(37, 99, 235, 0.15)", color: "#3b82f6",
                         padding: "2px 8px", borderRadius: 12, fontSize: "0.75rem", fontWeight: 700,
@@ -316,7 +316,7 @@ export const ResultsDashboard: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  <div style={{ height: 8, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                  <div style={{ height: 8, borderRadius: 4, background: "#e2e8f0", overflow: "hidden" }}>
                     <div style={{
                       height: "100%", borderRadius: 4, background: "linear-gradient(90deg, #2563eb, #60a5fa)",
                       width: `${t2Pct}%`, transition: "width 1s ease-in-out",
@@ -329,12 +329,12 @@ export const ResultsDashboard: React.FC = () => {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#38bdf8" }} />
-                      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#e2e8f0" }}>
+                      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#1e293b" }}>
                         Tier 3: Web Search (Internet)
                       </span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>{t3} match{t3 !== 1 ? "es" : ""}</span>
+                      <span style={{ fontSize: "0.85rem", color: "#64748b" }}>{t3} match{t3 !== 1 ? "es" : ""}</span>
                       <span style={{
                         background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8",
                         padding: "2px 8px", borderRadius: 12, fontSize: "0.75rem", fontWeight: 700,
@@ -343,7 +343,7 @@ export const ResultsDashboard: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  <div style={{ height: 8, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                  <div style={{ height: 8, borderRadius: 4, background: "#e2e8f0", overflow: "hidden" }}>
                     <div style={{
                       height: "100%", borderRadius: 4, background: "linear-gradient(90deg, #0ea5e9, #0ea5e9)",
                       width: `${t3Pct}%`, transition: "width 1s ease-in-out",

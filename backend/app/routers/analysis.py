@@ -28,23 +28,43 @@ from app.services.parser import extract_text
 from app.services.report import generate_pdf_report
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_text(value: str | None) -> str | None:
+    """Strip null bytes that PostgreSQL rejects in text/varchar columns.
+    Web-scraped content (Tavily) sometimes contains embedded \x00 bytes."""
+    if value is None:
+        return None
+    return value.replace("\x00", "")
+
 router = APIRouter(prefix="/api", tags=["analysis"])
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-async def _load_reference_entries(session: AsyncSession) -> list[ReferenceEntry]:
-    """Load all reference document chunks from the database."""
-    # Query ReferenceChunk joined with Document
-    result = await session.execute(
-        select(ReferenceChunk, Document.filename)
+async def _load_reference_entries(
+    session: AsyncSession,
+    exclude_content_hash: str | None = None,
+) -> list[ReferenceEntry]:
+    """Load all reference document chunks from the database.
+    
+    Args:
+        exclude_content_hash: If provided, skip the document with this content
+            hash.  This prevents a re-submitted document from matching against
+            its own earlier submission in the corpus.
+    """
+    query = (
+        select(ReferenceChunk, Document.filename, Document.content_hash)
         .join(Document, ReferenceChunk.document_id == Document.id)
     )
+    result = await session.execute(query)
     rows = result.all()
 
     entries: list[ReferenceEntry] = []
-    for ref_chunk, filename in rows:
+    for ref_chunk, filename, content_hash in rows:
+        if exclude_content_hash and content_hash == exclude_content_hash:
+            continue  # skip self-match
         entries.append(ReferenceEntry(text=ref_chunk.text, source_name=filename))
 
     return entries
@@ -81,8 +101,9 @@ async def _run_analysis_background(
             analysis.total_chunks = len(input_chunks)
             await session.commit()
 
-            # Load reference corpus
-            ref_entries = await _load_reference_entries(session)
+            # Load reference corpus — exclude this document's own previous submission
+            submission_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+            ref_entries = await _load_reference_entries(session, exclude_content_hash=submission_hash)
             logger.info(
                 "Analyzing '%s': %d chunks vs %d reference entries.",
                 filename, len(input_chunks), len(ref_entries),
@@ -106,14 +127,14 @@ async def _run_analysis_background(
                 finding = Finding(
                     analysis_id=analysis.id,
                     chunk_index=match.chunk_index,
-                    chunk_text=match.chunk_text,
-                    source_text=match.source_text,
-                    source_name=match.source_name,
+                    chunk_text=_sanitize_text(match.chunk_text),
+                    source_text=_sanitize_text(match.source_text),
+                    source_name=_sanitize_text(match.source_name),
                     similarity_score=match.combined_score,
                     tfidf_score=match.tfidf_score,
                     semantic_score=match.semantic_score,
                     match_type=match.match_type,
-                    flag_reason=match.flag_reason,
+                    flag_reason=_sanitize_text(match.flag_reason),
                     is_quoted=match.is_quoted,
                     start_char=match.start_char,
                     end_char=match.end_char,
@@ -142,7 +163,7 @@ async def _run_analysis_background(
                     repo_doc = Document(
                         filename=f"[Submission] {filename}",
                         content_hash=content_hash,
-                        text_content=text,
+                        text_content=_sanitize_text(text),
                         word_count=len(text.split()),
                     )
                     session.add(repo_doc)
@@ -162,39 +183,43 @@ async def _run_analysis_background(
                         filename, len(input_chunks),
                     )
 
-            # Phase 4c: Promote high-confidence web matches into permanent reference corpus
-            web_matches = [
-                m for m in result.matches
-                if m.match_type == "web" and m.combined_score >= 0.75 and m.source_text
-            ]
-            for wm in web_matches:
-                w_text = wm.source_text.strip()
-                if len(w_text) >= 50:
-                    w_hash = hashlib.sha256(w_text.encode("utf-8")).hexdigest()
-                    existing_web = await session.execute(
-                        select(Document).where(Document.content_hash == w_hash)
-                    )
-                    if not existing_web.scalar_one_or_none():
-                        w_name = wm.source_name or "Web Source"
-                        w_doc = Document(
-                            filename=f"[Web] {w_name[:120]}",
-                            content_hash=w_hash,
-                            text_content=w_text,
-                            word_count=len(w_text.split()),
-                        )
-                        session.add(w_doc)
-                        await session.flush()
-                        w_chunks = chunk_text(w_text)
-                        if w_chunks:
-                            w_embs = get_embeddings([wc.text for wc in w_chunks])
-                            for w_i, (wc, w_emb) in enumerate(zip(w_chunks, w_embs)):
-                                session.add(ReferenceChunk(
-                                    document_id=w_doc.id,
-                                    chunk_index=w_i,
-                                    text=wc.text,
-                                    embedding=w_emb,
-                                ))
-                        logger.info("Promoted web search match '%s' to reference corpus.", w_name)
+            # Phase 4c: Web promotion DISABLED to ensure stable, consistent
+            # scores across re-scans.  Tier 3 (Tavily) still runs live on
+            # every scan — matches just aren't saved to the local corpus.
+            # Uncomment below to re-enable automatic web source promotion.
+            #
+            # web_matches = [
+            #     m for m in result.matches
+            #     if m.match_type == "web" and m.combined_score >= 0.75 and m.source_text
+            # ]
+            # for wm in web_matches:
+            #     w_text = _sanitize_text(wm.source_text.strip())
+            #     if len(w_text) >= 50:
+            #         w_hash = hashlib.sha256(w_text.encode("utf-8")).hexdigest()
+            #         existing_web = await session.execute(
+            #             select(Document).where(Document.content_hash == w_hash)
+            #         )
+            #         if not existing_web.scalar_one_or_none():
+            #             w_name = wm.source_name or "Web Source"
+            #             w_doc = Document(
+            #                 filename=f"[Web] {w_name[:120]}",
+            #                 content_hash=w_hash,
+            #                 text_content=_sanitize_text(w_text),
+            #                 word_count=len(w_text.split()),
+            #             )
+            #             session.add(w_doc)
+            #             await session.flush()
+            #             w_chunks = chunk_text(w_text)
+            #             if w_chunks:
+            #                 w_embs = get_embeddings([wc.text for wc in w_chunks])
+            #                 for w_i, (wc, w_emb) in enumerate(zip(w_chunks, w_embs)):
+            #                     session.add(ReferenceChunk(
+            #                         document_id=w_doc.id,
+            #                         chunk_index=w_i,
+            #                         text=wc.text,
+            #                         embedding=w_emb,
+            #                     ))
+            #             logger.info("Promoted web search match '%s' to reference corpus.", w_name)
 
             await session.commit()
             logger.info("Analysis '%s' completed successfully. Score: %.1f%%", filename, result.overall_score)

@@ -130,7 +130,19 @@ async def delete_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
 
-    await session.delete(doc)
+    doc_name = doc.filename
+
+    # Use SQL DELETE instead of session.delete() to avoid lazy-loading
+    # the 'chunks' backref in async context (MissingGreenlet error).
+    # The DB-level ON DELETE CASCADE handles ReferenceChunk cleanup.
+    from sqlalchemy import delete
+    await session.execute(
+        delete(ReferenceChunk).where(ReferenceChunk.document_id == document_id)
+    )
+    await session.execute(
+        delete(Document).where(Document.id == document_id)
+    )
     await session.commit()
-    logger.info("Deleted reference document: '%s'.", doc.filename)
-    return {"detail": f"Document '{doc.filename}' deleted."}
+    logger.info("Deleted reference document: '%s'.", doc_name)
+    return {"detail": f"Document '{doc_name}' deleted."}
+
