@@ -5,8 +5,8 @@ import { FileUpload } from "./components/FileUpload";
 import { ResultsDashboard } from "./components/ResultsDashboard";
 import { AnalysisHistory } from "./components/AnalysisHistory";
 import { ReferenceDocs } from "./components/ReferenceDocs";
-import { LoginPage } from "./components/LoginPage";
-import { RegisterPage } from "./components/RegisterPage";
+import { LandingPage } from "./components/LandingPage";
+import { AuthModal } from "./components/AuthModal";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import "./styles/components.css";
 
@@ -46,15 +46,15 @@ const AppInner: React.FC = () => {
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <Navbar />
+      <AuthModal />
 
       <main style={{ flex: "1 0 auto" }}>
         <Routes>
           {/* Public routes */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/" element={<LandingPage />} />
 
           {/* Protected routes */}
-          <Route path="/" element={<ProtectedRoute><FileUpload /></ProtectedRoute>} />
+          <Route path="/scan" element={<ProtectedRoute><FileUpload /></ProtectedRoute>} />
           <Route path="/results/:id" element={<ProtectedRoute><ResultsDashboard /></ProtectedRoute>} />
           <Route path="/history" element={<ProtectedRoute><AnalysisHistory /></ProtectedRoute>} />
           <Route path="/references" element={<ProtectedRoute><ReferenceDocs /></ProtectedRoute>} />

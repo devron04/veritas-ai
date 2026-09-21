@@ -166,15 +166,7 @@ export const FileUpload: React.FC = () => {
               </button>
             </div>
 
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ fontSize: "0.825rem", padding: "6px 14px" }}
-              onClick={handleLoadSample}
-            >
-              <FileText size={14} />
-              <span>Load Sample Text</span>
-            </button>
+
           </div>
 
           {/* TAB 1: File Upload */}

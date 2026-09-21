@@ -6,10 +6,55 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Veritas AI — Intelligent Plagiarism & Paraphrase Detector</title>
     <meta name="description" content="Next-generation hybrid plagiarism detection combining TF-IDF lexical matching, sentence-transformer semantic embeddings, and automated citation filtering. Originality • Clarity • Trust." />
-    <!-- Google Fonts: Inter, Plus Jakarta Sans & JetBrains Mono -->
+    <!-- Google Fonts: Inter, Outfit, Plus Jakarta Sans & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        corePlugins: { preflight: false },
+        theme: {
+          extend: {
+            colors: {
+              "v-primary": "#2563eb",
+              "v-primary-dark": "#1d4ed8",
+              "v-indigo": "#4f46e5",
+              "v-slate-900": "#0f172a",
+              "v-slate-800": "#1e293b",
+              "v-slate-700": "#334155",
+              "v-slate-500": "#64748b",
+              "v-slate-400": "#94a3b8",
+              "v-slate-200": "#e2e8f0",
+              "v-slate-100": "#f1f5f9",
+              "v-slate-50": "#f8fafc",
+              "v-blue-50": "#eff6ff",
+              "v-blue-100": "#dbeafe",
+              "v-green": "#059669",
+              "v-green-50": "#ecfdf5",
+              "v-purple": "#7c3aed",
+              "v-purple-50": "#f5f3ff",
+              "v-orange": "#ea580c",
+              "v-orange-50": "#fff7ed",
+              "v-cyan": "#0891b2",
+              "v-cyan-50": "#ecfeff",
+              "v-pink": "#be185d",
+              "v-pink-50": "#fdf2f8",
+              "v-red": "#ef4444",
+              "v-red-50": "#fef2f2",
+            },
+            fontFamily: {
+              "headline": ["Outfit", "sans-serif"],
+              "body": ["Inter", "sans-serif"],
+              "mono": ["JetBrains Mono", "monospace"],
+            },
+          }
+        }
+      };
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -12,12 +12,17 @@ interface AuthUser {
   access_token: string;
 }
 
+export type AuthModalView = 'login' | 'register' | null;
+
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, fullName: string, password: string) => Promise<void>;
   logout: () => void;
+  authModalView: AuthModalView;
+  openAuthModal: (view: AuthModalView) => void;
+  closeAuthModal: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -34,6 +39,10 @@ const API_BASE = "http://localhost:8000/api";
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authModalView, setAuthModalView] = useState<AuthModalView>(null);
+
+  const openAuthModal = useCallback((view: AuthModalView) => setAuthModalView(view), []);
+  const closeAuthModal = useCallback(() => setAuthModalView(null), []);
 
   // On mount — restore session from localStorage
   useEffect(() => {
@@ -88,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, authModalView, openAuthModal, closeAuthModal }}>
       {children}
     </AuthContext.Provider>
   );

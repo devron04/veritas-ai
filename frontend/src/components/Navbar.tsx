@@ -7,9 +7,9 @@ import { useAuth } from "../hooks/useAuth";
 export const Navbar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, openAuthModal } = useAuth();
   const [isHealthy, setIsHealthy] = useState<boolean | null>(null);
-  const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -26,6 +26,7 @@ export const Navbar: React.FC = () => {
   }, []);
 
   return (
+    <>
     <header className="navbar">
       <div className="navbar-container">
         {/* Brand */}
@@ -42,71 +43,37 @@ export const Navbar: React.FC = () => {
         </Link>
 
         {/* Nav Links */}
-        <nav className="nav-links">
-          <Link
-            to="/"
-            className={`nav-link ${location.pathname === "/" ? "active" : ""}`}
-          >
-            <FileSearch size={16} />
-            <span>Scan Document</span>
-          </Link>
+        {user && (
+          <nav className="nav-links">
+            <Link
+              to="/scan"
+              className={`nav-link ${location.pathname === "/scan" ? "active" : ""}`}
+            >
+              <FileSearch size={16} />
+              <span>Scan Document</span>
+            </Link>
 
-          <Link
-            to="/history"
-            className={`nav-link ${location.pathname === "/history" ? "active" : ""}`}
-          >
-            <History size={16} />
-            <span>Analysis History</span>
-          </Link>
+            <Link
+              to="/history"
+              className={`nav-link ${location.pathname === "/history" ? "active" : ""}`}
+            >
+              <History size={16} />
+              <span>Analysis History</span>
+            </Link>
 
-          <Link
-            to="/references"
-            className={`nav-link ${location.pathname === "/references" ? "active" : ""}`}
-          >
-            <Database size={16} />
-            <span>Reference Corpus</span>
-          </Link>
-        </nav>
+            <Link
+              to="/references"
+              className={`nav-link ${location.pathname === "/references" ? "active" : ""}`}
+            >
+              <Database size={16} />
+              <span>Reference Corpus</span>
+            </Link>
+          </nav>
+        )}
 
         {/* Right side: status + user */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {!isAuthPage && (
-            <div
-              className="status-pill"
-              style={{
-                borderColor: isHealthy ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                background: isHealthy ? "rgba(16, 185, 129, 0.08)" : "rgba(239, 68, 68, 0.08)",
-                color: isHealthy ? "#059669" : "#dc2626",
-              }}
-            >
-              <span
-                className="status-dot"
-                style={{
-                  background: isHealthy ? "#10b981" : "#ef4444",
-                  boxShadow: isHealthy ? "0 0 6px #10b981" : "0 0 6px #ef4444",
-                }}
-              />
-              <span>{isHealthy ? "Engine Online" : "Connecting..."}</span>
-            </div>
-          )}
 
-          <div
-            title="Hybrid SBERT + TF-IDF Active"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              fontSize: "0.75rem",
-              color: "var(--text-dim)",
-              padding: "4px 8px",
-              borderRadius: "6px",
-              background: "rgba(37, 99, 235, 0.04)",
-              border: "1px solid rgba(37, 99, 235, 0.1)",
-            }}
-          >
-            <Cpu size={14} color="#2563eb" />
-            <span>Hybrid NLP</span>
-          </div>
 
           {/* User section */}
           {user ? (
@@ -122,12 +89,7 @@ export const Navbar: React.FC = () => {
                 {user.full_name.charAt(0).toUpperCase()}
               </div>
               <button
-                onClick={() => { 
-                  if (window.confirm("Are you sure you want to sign out?")) {
-                    logout(); 
-                    navigate("/login"); 
-                  }
-                }}
+                onClick={() => setShowLogoutConfirm(true)}
                 title="Sign out"
                 style={{
                   display: "flex", alignItems: "center", gap: 5,
@@ -143,23 +105,80 @@ export const Navbar: React.FC = () => {
                 <span>Sign out</span>
               </button>
             </div>
-          ) : !isAuthPage ? (
-            <Link
-              to="/login"
+          ) : (
+            <button
+              onClick={() => openAuthModal('login')}
               style={{
                 display: "flex", alignItems: "center", gap: 5,
                 background: "linear-gradient(135deg, #2563eb, #4f46e5)",
-                color: "#fff", borderRadius: 8, padding: "7px 14px",
+                color: "#fff", border: "none", cursor: "pointer",
+                borderRadius: 8, padding: "7px 14px",
                 fontSize: "0.85rem", fontWeight: 600, textDecoration: "none",
                 boxShadow: "0 2px 8px rgba(37,99,235,0.3)",
               }}
             >
               <UserCircle size={14} />
               <span>Sign In</span>
-            </Link>
-          ) : null}
+            </button>
+          )}
         </div>
       </div>
+
     </header>
+
+      {showLogoutConfirm && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999999,
+          animation: "fadeIn 0.2s ease-out"
+        }}>
+          <div style={{
+            background: "#fff", padding: "24px", borderRadius: "16px",
+            boxShadow: "0 10px 25px rgba(0,0,0,0.1), 0 4px 10px rgba(0,0,0,0.05)",
+            width: "100%", maxWidth: "320px", display: "flex", flexDirection: "column", gap: "16px",
+            animation: "slideUp 0.2s ease-out"
+          }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", textAlign: "center" }}>
+              <div style={{ margin: "0 auto", background: "#eff6ff", color: "#2563eb", width: "48px", height: "48px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "8px" }}>
+                <LogOut size={24} />
+              </div>
+              <h3 style={{ margin: 0, color: "#0f172a", fontSize: "1.1rem" }}>Sign Out</h3>
+              <p style={{ margin: 0, color: "#64748b", fontSize: "0.9rem" }}>Are you sure you want to sign out of your account?</p>
+            </div>
+            <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                style={{
+                  flex: 1, padding: "10px", borderRadius: "8px", background: "#f1f5f9",
+                  color: "#475569", border: "none", fontWeight: 600, cursor: "pointer",
+                  transition: "background 0.2s"
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "#e2e8f0"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "#f1f5f9"}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowLogoutConfirm(false);
+                  logout();
+                  navigate("/login");
+                }}
+                style={{
+                  flex: 1, padding: "10px", borderRadius: "8px", background: "#2563eb",
+                  color: "#fff", border: "none", fontWeight: 600, cursor: "pointer",
+                  transition: "background 0.2s"
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "#1d4ed8"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "#2563eb"}
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
