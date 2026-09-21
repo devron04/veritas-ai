@@ -31,7 +31,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const STORAGE_KEY = "veritas_ai_token";
-const API_BASE = "http://localhost:8000/api";
+// Use Render URL for production
+const API_BASE = "https://veritas-ai-3ia4.onrender.com/api";
 
 // ---------------------------------------------------------------------------
 // Provider
