@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     # Tavily web search (optional)
     TAVILY_API_KEY: str = ""
 
+    # Hugging Face Inference API (optional fallback for free hosting)
+    HF_API_TOKEN: str = ""
+
     # Sentence-transformer model
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
 
