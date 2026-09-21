@@ -122,7 +122,12 @@ export const Navbar: React.FC = () => {
                 {user.full_name.charAt(0).toUpperCase()}
               </div>
               <button
-                onClick={() => { logout(); navigate("/login"); }}
+                onClick={() => { 
+                  if (window.confirm("Are you sure you want to sign out?")) {
+                    logout(); 
+                    navigate("/login"); 
+                  }
+                }}
                 title="Sign out"
                 style={{
                   display: "flex", alignItems: "center", gap: 5,

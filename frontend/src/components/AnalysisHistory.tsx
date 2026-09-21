@@ -1,14 +1,18 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { History, FileText, Trash2, ArrowRight, RefreshCw, AlertCircle } from "lucide-react";
 import { fetchAnalyses, deleteAnalysis } from "../hooks/useApi";
+import { useAuth } from "../hooks/useAuth";
 import type { AnalysisSummary } from "../types";
 import { getScoreColor } from "../types";
 
 export const AnalysisHistory: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [analyses, setAnalyses] = useState<AnalysisSummary[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const isInitialLoad = useRef(true);
 
   const loadData = async () => {
     try {
@@ -17,9 +21,12 @@ export const AnalysisHistory: React.FC = () => {
       const res = await fetchAnalyses();
       setAnalyses(res.analyses);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to load past analyses.");
+      if (!isInitialLoad.current) {
+        setError(err.response?.data?.detail || "Failed to load past analyses.");
+      }
     } finally {
       setLoading(false);
+      isInitialLoad.current = false;
     }
   };
 
@@ -60,6 +67,16 @@ export const AnalysisHistory: React.FC = () => {
           <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
           <span>Refresh</span>
         </button>
+      </div>
+
+      <div style={{
+        padding: "10px 16px", marginBottom: 24, borderRadius: 8,
+        background: isAdmin ? "rgba(16, 185, 129, 0.1)" : "rgba(37, 99, 235, 0.1)",
+        border: `1px solid ${isAdmin ? "rgba(16, 185, 129, 0.2)" : "rgba(37, 99, 235, 0.2)"}`,
+        color: isAdmin ? "#059669" : "#2563eb", fontSize: "0.85rem", fontWeight: 600,
+        display: "inline-block"
+      }}>
+        {isAdmin ? "Admin View: Showing scans from all users" : "Showing your personal scan history"}
       </div>
 
       {error && (

@@ -1,15 +1,19 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Database, UploadCloud, Trash2, FileText, Plus, RefreshCw, AlertCircle, Sparkles } from "lucide-react";
 import { fetchDocuments, uploadReferenceDoc, deleteDocument } from "../hooks/useApi";
+import { useAuth } from "../hooks/useAuth";
 import type { ReferenceDocument } from "../types";
 
 export const ReferenceDocs: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [documents, setDocuments] = useState<ReferenceDocument[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [uploading, setUploading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isInitialLoad = useRef(true);
   const [uploadProgress, setUploadProgress] = useState<{
     current: number;
     total: number;
@@ -24,9 +28,13 @@ export const ReferenceDocs: React.FC = () => {
       const res = await fetchDocuments();
       setDocuments(res.documents);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to load reference documents.");
+      // Only show error on user-triggered refresh, not initial load
+      if (!isInitialLoad.current) {
+        setError(err.response?.data?.detail || "Failed to load reference documents.");
+      }
     } finally {
       setLoading(false);
+      isInitialLoad.current = false;
     }
   };
 
@@ -111,24 +119,28 @@ export const ReferenceDocs: React.FC = () => {
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept=".pdf,.docx,.txt"
-            onChange={handleFileUpload}
-            style={{ display: "none" }}
-          />
+          {isAdmin && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.docx,.txt"
+                onChange={handleFileUpload}
+                style={{ display: "none" }}
+              />
 
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-          >
-            <Plus size={16} />
-            <span>{uploading ? "Indexing Documents..." : "Add Reference Document(s)"}</span>
-          </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                <Plus size={16} />
+                <span>{uploading ? "Indexing Documents..." : "Add Reference Document(s)"}</span>
+              </button>
+            </>
+          )}
 
           <button
             type="button"
@@ -237,6 +249,19 @@ export const ReferenceDocs: React.FC = () => {
         </p>
       </div>
 
+      {!isAdmin && (
+        <div style={{
+          padding: 16, marginBottom: 24, borderRadius: 12,
+          background: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.2)",
+          display: "flex", alignItems: "center", gap: 12, color: "#d97706"
+        }}>
+          <AlertCircle size={20} />
+          <span style={{ fontSize: "0.9rem", fontWeight: 500 }}>
+            The Reference Corpus is managed by administrators. Your scans are automatically checked against this database.
+          </span>
+        </div>
+      )}
+
       {loading ? (
         <div style={{ textAlign: "center", padding: "80px 20px" }}>
           <RefreshCw size={36} color="#2563eb" className="animate-spin" style={{ margin: "0 auto 12px" }} />
@@ -330,17 +355,19 @@ export const ReferenceDocs: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  style={{ padding: "6px 10px" }}
-                  onClick={() => handleDelete(doc.id, doc.filename)}
-                  title="Remove from corpus"
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
+              {isAdmin && (
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    style={{ padding: "6px 10px" }}
+                    onClick={() => handleDelete(doc.id, doc.filename)}
+                    title="Remove from corpus"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -349,16 +376,20 @@ export const ReferenceDocs: React.FC = () => {
           <UploadCloud size={48} color="var(--text-dim)" style={{ margin: "0 auto 16px" }} />
           <h3 style={{ fontSize: "1.2rem", fontWeight: 700 }}>Corpus is Currently Empty</h3>
           <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginTop: 6, marginBottom: 20 }}>
-            Upload source documents (.pdf, .docx, .txt) to seed your local plagiarism detection database.
+            {isAdmin 
+              ? "Upload source documents (.pdf, .docx, .txt) to seed your local plagiarism detection database."
+              : "The corpus is currently empty. Administrators can upload documents here."}
           </p>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Plus size={16} />
-            <span>Upload Reference Material</span>
-          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Plus size={16} />
+              <span>Upload Reference Material</span>
+            </button>
+          )}
         </div>
       )}
     </div>

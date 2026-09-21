@@ -355,18 +355,28 @@ async def list_analyses(
     skip: int = 0,
     limit: int = 20,
     session: AsyncSession = Depends(get_session),
+    current_user: User | None = Depends(get_current_user),
 ):
     """List all past analyses (newest first)."""
+    # Filter by user if not admin
+    is_admin = current_user and current_user.role == "admin"
+    user_id = current_user.id if current_user else None
+
     # Count total
-    count_result = await session.execute(select(func.count(Analysis.id)))
+    count_query = select(func.count(Analysis.id))
+    if not is_admin:
+        count_query = count_query.where(Analysis.user_id == user_id)
+    
+    count_result = await session.execute(count_query)
     total = count_result.scalar() or 0
 
     # Fetch page
+    query = select(Analysis).order_by(Analysis.created_at.desc())
+    if not is_admin:
+        query = query.where(Analysis.user_id == user_id)
+        
     result = await session.execute(
-        select(Analysis)
-        .order_by(Analysis.created_at.desc())
-        .offset(skip)
-        .limit(limit)
+        query.offset(skip).limit(limit)
     )
     analyses = result.scalars().all()
 

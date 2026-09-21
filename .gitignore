@@ -60,3 +60,7 @@ Thumbs.db
 # ---------- Misc ----------
 .agents/
 *.log
+
+# ---------- Admin / Migration Scripts ----------
+backend/make_admin.py
+backend/migrate_add_columns.py

@@ -37,6 +37,9 @@ async def upload_document(
     current_user: User | None = Depends(get_current_user),
 ):
     """Upload a reference document to the corpus."""
+    if not current_user or current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only administrators can upload to the Reference Corpus.")
+
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided.")
 
@@ -141,9 +144,9 @@ async def delete_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
 
-    # Only owner or admin can delete; anonymous users can delete any anonymous doc
-    if current_user and doc.owner_id and doc.owner_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="You can only delete your own documents.")
+    # Only admins can delete from the Reference Corpus
+    if not current_user or current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only administrators can delete from the Reference Corpus.")
 
     doc_name = doc.filename
 

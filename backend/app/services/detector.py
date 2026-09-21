@@ -145,9 +145,9 @@ def _tfidf_compare(
         return np.zeros((len(input_texts), 0))
 
     vectorizer = TfidfVectorizer(
-        analyzer="char_wb",
-        ngram_range=(3, 5),
-        max_features=50000,
+        analyzer="word",
+        ngram_range=(1, 2),
+        max_features=25000,
         sublinear_tf=True,
     )
 
@@ -232,8 +232,61 @@ def _semantic_compare(
 
 
 # ---------------------------------------------------------------------------
-# Layer 3: Web search (optional)
+# Layer 3: Web search helpers
 # ---------------------------------------------------------------------------
+def _extract_key_phrases(
+    chunk_texts: list[str],
+    max_phrases: int = 15,
+) -> list[str]:
+    """
+    Extract diverse, representative phrases from unmatched chunks.
+    Uses TF-IDF to pick the most distinctive sentences that will
+    lead search engines to the right source pages.
+    """
+    if not chunk_texts:
+        return []
+
+    # Filter out very short chunks (headers, references, numbers)
+    meaningful = [t for t in chunk_texts if len(t.split()) >= 8]
+    if not meaningful:
+        meaningful = chunk_texts
+
+    if len(meaningful) <= max_phrases:
+        return meaningful
+
+    try:
+        # Use TF-IDF to rank chunks by distinctiveness
+        vectorizer = TfidfVectorizer(
+            max_features=5000,
+            ngram_range=(1, 2),
+            stop_words="english",
+        )
+        tfidf_matrix = vectorizer.fit_transform(meaningful)
+
+        # Score each chunk by its total TF-IDF weight (more unique = higher score)
+        chunk_importance = np.array(tfidf_matrix.sum(axis=1)).flatten()
+
+        # Select top chunks by importance, but ensure diversity
+        # by spacing selections across the document
+        ranked_indices = np.argsort(chunk_importance)[::-1]
+
+        # Take top candidates (2x what we need)
+        candidates = ranked_indices[:max_phrases * 2].tolist()
+
+        # Space them out across the document for diversity
+        candidates.sort()  # restore document order
+        step = max(1, len(candidates) // max_phrases)
+        selected = candidates[::step][:max_phrases]
+
+        return [meaningful[i] for i in selected]
+
+    except Exception as e:
+        logger.warning("Key phrase extraction failed, using sampling: %s", e)
+        # Fallback: evenly sample from the chunks
+        step = max(1, len(meaningful) // max_phrases)
+        return meaningful[::step][:max_phrases]
+
+
 def _chunk_raw_content(raw_content: str, max_chunks: int | None = None) -> list[str]:
     """Split raw web page content into sentence-level chunks for comparison."""
     if max_chunks is None:
@@ -396,25 +449,16 @@ def _process_web_results(
     return results
 
 
-async def _web_search_check(
-    chunk_text: str,
-) -> list[tuple[str, str, float]]:
+async def _fetch_web_search_data_cached(query_text: str) -> dict:
     """
-    Search for a text chunk on the web using the Tavily API.
-    Uses advanced search with full page content, then routes results
-    through TF-IDF + semantic engines for accurate scoring.
-
-    Results are cached in the database for 7 days to save API quota
-    and ensure reproducibility.
-
-    Returns a list of (source_url, best_matching_passage, similarity_score) tuples.
+    Fetch search results from Tavily API, backed by a 7-day database cache
+    to ensure stable, reproducible scoring and save API quota.
     """
     if not settings.TAVILY_API_KEY:
-        return []
+        return {}
 
     import httpx
-
-    query_hash = _compute_query_hash(chunk_text)
+    query_hash = _compute_query_hash(query_text)
 
     # --- Check cache first ---
     try:
@@ -432,7 +476,7 @@ async def _web_search_check(
 
             if cached:
                 logger.debug("Web search cache HIT for hash %s", query_hash[:12])
-                return _process_web_results(chunk_text, cached.response_data)
+                return cached.response_data
     except Exception as e:
         logger.debug("Cache lookup failed (non-fatal): %s", e)
 
@@ -443,7 +487,7 @@ async def _web_search_check(
                 "https://api.tavily.com/search",
                 json={
                     "api_key": settings.TAVILY_API_KEY,
-                    "query": chunk_text[:400],
+                    "query": query_text[:400],
                     "search_depth": "advanced",
                     "include_raw_content": True,
                     "max_results": settings.WEB_SEARCH_MAX_RESULTS,
@@ -459,7 +503,7 @@ async def _web_search_check(
             async with async_session() as session:
                 cache_entry = WebSearchCache(
                     query_hash=query_hash,
-                    query_text=chunk_text[:500],
+                    query_text=query_text[:500],
                     response_data=data,
                     expires_at=datetime.now(timezone.utc) + timedelta(days=7),
                 )
@@ -469,11 +513,25 @@ async def _web_search_check(
         except Exception as e:
             logger.debug("Cache store failed (non-fatal): %s", e)
 
-        return _process_web_results(chunk_text, data)
+        return data
 
     except Exception as e:
-        logger.warning("Web search failed for chunk: %s", e)
-        return []
+        logger.warning("Web search API failed for query: %s", e)
+        return {}
+
+
+async def _web_search_check(
+    chunk_text: str,
+) -> list[tuple[str, str, float]]:
+    """
+    Search for a text chunk on the web using the Tavily API (cached).
+    Uses advanced search with full page content, then routes results
+    through TF-IDF + semantic engines for accurate scoring.
+    """
+    data = await _fetch_web_search_data_cached(chunk_text)
+    if data:
+        return _process_web_results(chunk_text, data)
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -720,57 +778,215 @@ async def run_detection(
                 end_char=chunk.end_char,
             ))
 
-    # ---- Layer 3: Web search (optional, with graceful failure) ----
+    # ---- Layer 3: Web search (two-phase smart approach) ----
     web_search_attempted = False
     web_search_succeeded = False
 
     if enable_web_search and settings.TAVILY_API_KEY and web_search_chunks:
         web_search_attempted = True
-        await _report(65.0, f"Searching the web for {len(web_search_chunks)} unmatched passages...")
-        logger.info("Running web search on %d unmatched chunks...", len(web_search_chunks))
-        # Limit web searches to manage API quota
-        search_limit = min(len(web_search_chunks), 50)
+        total_unmatched = len(web_search_chunks)
+        await _report(65.0, f"Smart web search: {total_unmatched} unmatched passages to check...")
+        logger.info("Running two-phase web search on %d unmatched chunks...", total_unmatched)
+
+        # ====================================================================
+        # PHASE 1: Document-level broad search
+        #   - Extract key phrases from unmatched chunks
+        #   - Search 10-15 times → download full pages
+        #   - Compare ALL unmatched chunks against downloaded pages locally
+        # ====================================================================
+        await _report(66.0, "Phase 1: Extracting key phrases for broad web search...")
+
+        # Collect all unmatched chunk texts
+        unmatched_texts = [input_chunks[idx].text for idx in web_search_chunks]
+
+        # Extract diverse key phrases from unmatched content
+        key_phrases = _extract_key_phrases(unmatched_texts, max_phrases=15)
+        logger.info("Extracted %d key phrases for broad search.", len(key_phrases))
+
+        # Search each key phrase and collect all downloaded page content
+        downloaded_pages: list[tuple[str, str]] = []  # (url, full_text)
+
+        for kp_idx, phrase in enumerate(key_phrases):
+            try:
+                data = await _fetch_web_search_data_cached(phrase)
+                if data:
+                    web_search_succeeded = True
+                    for result in data.get("results", []):
+                        url = result.get("url", "unknown")
+                        raw_content = result.get("raw_content", "")
+                        snippet = result.get("content", "")
+                        page_text = raw_content if raw_content and len(raw_content) > 50 else snippet
+                        if page_text and len(page_text) > 30:
+                            downloaded_pages.append((url, page_text))
+            except Exception as e:
+                logger.warning("Broad search failed for phrase %d: %s", kp_idx, e)
+
+            pct = 66.0 + (14.0 * (kp_idx + 1) / len(key_phrases))
+            await _report(pct, f"Phase 1: Searched {kp_idx + 1}/{len(key_phrases)} key phrases ({len(downloaded_pages)} pages found)...")
+
+        # De-duplicate downloaded pages by URL
+        seen_urls = set()
+        unique_pages: list[tuple[str, str]] = []
+        for url, text in downloaded_pages:
+            url_base = url.split("?")[0].rstrip("/")
+            if url_base not in seen_urls:
+                seen_urls.add(url_base)
+                unique_pages.append((url, text))
+
+        logger.info("Phase 1: Downloaded %d unique pages. Comparing all %d chunks locally...",
+                     len(unique_pages), total_unmatched)
+        await _report(80.0, f"Phase 1: Comparing {total_unmatched} chunks against {len(unique_pages)} downloaded pages...")
+
+        # Compare ALL unmatched chunks against downloaded pages locally
+        phase1_matched = set()
         web_match_count = 0
 
-        for idx in web_search_chunks[:search_limit]:
-            chunk = input_chunks[idx]
-            if should_filter_chunk(chunk.text, corpus_sample):
-                continue
+        # Batch all chunks from all pages to compare against each input chunk ONCE
+        all_web_chunks = []
+        chunk_to_url = []
+        for page_url, page_text in unique_pages:
+            page_chunks_list = _chunk_raw_content(page_text)
+            all_web_chunks.extend(page_chunks_list)
+            chunk_to_url.extend([page_url] * len(page_chunks_list))
 
-            try:
-                web_results = await _web_search_check(chunk.text)
-                if web_results:
-                    web_search_succeeded = True
-                for url, snippet, sim in web_results:
-                    if sim >= settings.SUSPICIOUS_THRESHOLD:
+        if all_web_chunks:
+            import asyncio
+            
+            active_search_indices = []
+            active_texts = []
+            for idx in web_search_chunks:
+                chunk = input_chunks[idx]
+                if should_filter_chunk(chunk.text, corpus_sample):
+                    phase1_matched.add(idx)
+                else:
+                    active_search_indices.append(idx)
+                    active_texts.append(chunk.text)
+
+            if active_texts:
+                await _report(80.0, f"Phase 1: Computing TF-IDF for {len(active_texts)} chunks against {len(all_web_chunks)} web passages...")
+                
+                # 1. Compute TF-IDF matrix for all active chunks vs all web chunks
+                tfidf_matrix = await asyncio.to_thread(_tfidf_compare, active_texts, all_web_chunks)
+
+                # 2. Compute Semantic matrix for all active chunks vs all web chunks
+                await _report(85.0, f"Phase 1: Computing deep semantic embeddings for {len(all_web_chunks)} web passages...")
+                try:
+                    sem_matrix = await asyncio.to_thread(_semantic_compare, active_texts, all_web_chunks)
+                except Exception as e:
+                    logger.warning("Phase 1 semantic batch comparison failed: %s", e)
+                    sem_matrix = None
+
+                # 3. Combine matrices and extract best matches globally
+                for i, idx in enumerate(active_search_indices):
+                    chunk = input_chunks[idx]
+                    
+                    if sem_matrix is not None:
+                        # Vectorized combination of TF-IDF and Semantic scores
+                        tf_scores = tfidf_matrix[i].toarray()[0] if hasattr(tfidf_matrix[i], 'toarray') else tfidf_matrix[i]
+                        sm_scores = sem_matrix[i]
+                        
+                        # Apply weighting rules vectorized
+                        # In a massive global corpus, TF-IDF naturally suppresses scores due to document frequency.
+                        # We take the maximum of the direct semantic score and the blended score to ensure 
+                        # heavily paraphrased matches identified by the AI are not dragged below the threshold.
+                        blended = (settings.TFIDF_WEIGHT * tf_scores) + (settings.SEMANTIC_WEIGHT * sm_scores)
+                        combined_scores = np.where(
+                            (tf_scores > 0) & (sm_scores > 0),
+                            np.maximum(sm_scores, blended),
+                            np.where(
+                                sm_scores > 0,
+                                sm_scores * 0.90,
+                                tf_scores * 0.80
+                            )
+                        )
+                        best_c_idx = int(np.argmax(combined_scores))
+                        best_combined_score = float(combined_scores[best_c_idx])
+                    else:
+                        tf_scores_fallback = tfidf_matrix[i].toarray()[0] if hasattr(tfidf_matrix[i], 'toarray') else tfidf_matrix[i]
+                        best_c_idx = int(np.argmax(tf_scores_fallback))
+                        best_combined_score = float(tf_scores_fallback[best_c_idx]) * 0.80
+                        
+                    if best_combined_score >= settings.SUSPICIOUS_THRESHOLD:
+                        page_url = chunk_to_url[best_c_idx]
+                        best_passage = all_web_chunks[best_c_idx]
+                        
                         web_reason = _generate_flag_reason(
-                            "web", 0.0, sim, sim, url
+                            "web", 0.0, best_combined_score, best_combined_score, page_url
                         )
                         matches.append(MatchResult(
                             chunk_index=chunk.index,
                             chunk_text=chunk.text,
-                            source_text=snippet,
-                            source_name=url,
+                            source_text=best_passage,
+                            source_name=page_url,
                             tfidf_score=0.0,
-                            semantic_score=sim,
-                            combined_score=sim,
+                            semantic_score=best_combined_score,
+                            combined_score=best_combined_score,
                             match_type="web",
                             flag_reason=web_reason,
                             is_quoted=chunk.is_quoted,
                             start_char=chunk.start_char,
                             end_char=chunk.end_char,
                         ))
-                        # Update chunk score
-                        chunk_scores[idx] = max(chunk_scores[idx], sim)
+                        chunk_scores[idx] = max(chunk_scores[idx], best_combined_score)
                         web_match_count += 1
-                        break  # one web match per chunk is enough
-                # Report web search progress per chunk
-                web_progress_pct = 65.0 + (25.0 * (web_search_chunks[:search_limit].index(idx) + 1) / search_limit)
-                await _report(web_progress_pct, f"Web search: checked {web_search_chunks[:search_limit].index(idx) + 1}/{search_limit} chunks...")
-            except Exception as e:
-                logger.warning("Web search failed for chunk %d: %s", idx, e)
-                continue  # Don't let one failure kill the whole analysis
+                        phase1_matched.add(idx)
 
+        logger.info("Phase 1 matched %d chunks from downloaded pages.", web_match_count)
+
+        # ====================================================================
+        # PHASE 2: Targeted individual search for remaining unmatched chunks
+        #   - Only chunks not caught by Phase 1 get individual searches
+        #   - Much fewer API calls needed since Phase 1 caught most matches
+        # ====================================================================
+        remaining_chunks = [idx for idx in web_search_chunks
+                           if idx not in phase1_matched]
+
+        if remaining_chunks:
+            # Limit phase 2 to conserve API quota, but search more than before
+            phase2_limit = min(len(remaining_chunks), 80)
+            await _report(85.0, f"Phase 2: Targeted search for {phase2_limit} remaining chunks...")
+            logger.info("Phase 2: Individual search for %d remaining chunks (limit %d).",
+                         len(remaining_chunks), phase2_limit)
+
+            for search_idx, idx in enumerate(remaining_chunks[:phase2_limit]):
+                chunk = input_chunks[idx]
+                if should_filter_chunk(chunk.text, corpus_sample):
+                    continue
+
+                try:
+                    web_results = await _web_search_check(chunk.text)
+                    if web_results:
+                        web_search_succeeded = True
+                    for url, snippet, sim in web_results:
+                        if sim >= settings.SUSPICIOUS_THRESHOLD:
+                            web_reason = _generate_flag_reason(
+                                "web", 0.0, sim, sim, url
+                            )
+                            matches.append(MatchResult(
+                                chunk_index=chunk.index,
+                                chunk_text=chunk.text,
+                                source_text=snippet,
+                                source_name=url,
+                                tfidf_score=0.0,
+                                semantic_score=sim,
+                                combined_score=sim,
+                                match_type="web",
+                                flag_reason=web_reason,
+                                is_quoted=chunk.is_quoted,
+                                start_char=chunk.start_char,
+                                end_char=chunk.end_char,
+                            ))
+                            chunk_scores[idx] = max(chunk_scores[idx], sim)
+                            web_match_count += 1
+                            break  # one match per chunk
+                except Exception as e:
+                    logger.warning("Phase 2 web search failed for chunk %d: %s", idx, e)
+                    continue
+
+                pct = 85.0 + (10.0 * (search_idx + 1) / phase2_limit)
+                await _report(pct, f"Phase 2: Searched {search_idx + 1}/{phase2_limit} remaining chunks...")
+
+        logger.info("Web search complete: %d total web matches found.", web_match_count)
         tiers_used["tier3_web"] = web_search_succeeded
         if web_search_attempted and not web_search_succeeded:
             note = tiers_used.get("web_search_note", "")
