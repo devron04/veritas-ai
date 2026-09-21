@@ -8,9 +8,10 @@ import type {
 } from "../types";
 
 const api = axios.create({
-  // Hardcoded for production to bypass Vercel env variable injection issues
-  baseURL: "https://veritas-ai-3ia4.onrender.com/api",
-  timeout: 300_000, // 5 min — large documents take time
+  baseURL: import.meta.env.PROD 
+    ? "https://veritas-ai-3ia4.onrender.com/api" 
+    : "http://localhost:8000/api",
+  timeout: 300_000,
 });
 
 // Attach JWT token to every request
