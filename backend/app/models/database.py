@@ -30,6 +30,22 @@ def _utcnow() -> datetime:
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
+class User(Base):
+    """An authenticated user of Veritas AI."""
+    __tablename__ = "users"
+
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    full_name = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    role = Column(String(32), default="user")  # user | admin
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
+
+    def __repr__(self) -> str:
+        return f"<User {self.email}>"
+
+
 class Document(Base):
     """A reference document stored in the corpus."""
     __tablename__ = "documents"
@@ -39,6 +55,7 @@ class Document(Base):
     content_hash = Column(String(64), nullable=False, index=True, unique=True)
     text_content = Column(Text, nullable=False)
     word_count = Column(Integer, nullable=False, default=0)
+    owner_id = Column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_utcnow)
 
     def __repr__(self) -> str:
@@ -82,8 +99,9 @@ class Analysis(Base):
     status = Column(String(32), default="pending")  # pending | processing | completed | failed
     error_message = Column(Text, nullable=True)
     progress = Column(Float, default=0.0)  # 0-100 real-time progress percentage
-    progress_message = Column(String(256), nullable=True)  # e.g. "Scanning chunk 3/12 with semantic AI..."
-    tiers_used = Column(JSON, nullable=True)  # e.g. {"tier1_lexical": true, "tier2_semantic": true, "tier3_web": false, "web_search_note": "..."}
+    progress_message = Column(String(256), nullable=True)
+    tiers_used = Column(JSON, nullable=True)
+    user_id = Column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_utcnow)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 

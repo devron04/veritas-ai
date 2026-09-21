@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.models.database import init_db
-from app.routers import analysis, documents
+from app.routers import analysis, documents, auth
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -40,6 +40,7 @@ app.add_middleware(
 )
 
 # Routers
+app.include_router(auth.router)
 app.include_router(analysis.router)
 app.include_router(documents.router)
 

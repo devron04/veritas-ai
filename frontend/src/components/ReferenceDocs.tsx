@@ -10,6 +10,12 @@ export const ReferenceDocs: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadProgress, setUploadProgress] = useState<{
+    current: number;
+    total: number;
+    currentFile: string;
+    failedFiles: string[];
+  } | null>(null);
 
   const loadData = async () => {
     try {
@@ -29,20 +35,53 @@ export const ReferenceDocs: React.FC = () => {
   }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0]) return;
-    const file = e.target.files[0];
+    if (!e.target.files || e.target.files.length === 0) return;
+    const files = Array.from(e.target.files);
 
     try {
       setUploading(true);
       setError(null);
       setSuccessMsg(null);
-      const newDoc = await uploadReferenceDoc(file);
-      setDocuments((prev) => [newDoc, ...prev]);
-      setSuccessMsg(`"${file.name}" was indexed into the reference corpus.`);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to upload reference document.");
+      const failedFiles: string[] = [];
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setUploadProgress({
+          current: i,
+          total: files.length,
+          currentFile: file.name,
+          failedFiles: [...failedFiles],
+        });
+        
+        try {
+          const newDoc = await uploadReferenceDoc(file);
+          setDocuments((prev) => [newDoc, ...prev]);
+        } catch (err: any) {
+          console.error(`Failed to upload ${file.name}:`, err);
+          failedFiles.push(file.name);
+        }
+      }
+      
+      // Final state
+      setUploadProgress({
+        current: files.length,
+        total: files.length,
+        currentFile: "",
+        failedFiles,
+      });
+
+      const successCount = files.length - failedFiles.length;
+      if (successCount > 0) {
+        setSuccessMsg(
+          `Successfully indexed ${successCount} of ${files.length} document${files.length > 1 ? "s" : ""} into the reference corpus.`
+        );
+      }
+      if (failedFiles.length > 0) {
+        setError(`Failed to upload: ${failedFiles.join(", ")}`);
+      }
     } finally {
       setUploading(false);
+      setTimeout(() => setUploadProgress(null), 3000);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -75,6 +114,7 @@ export const ReferenceDocs: React.FC = () => {
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             accept=".pdf,.docx,.txt"
             onChange={handleFileUpload}
             style={{ display: "none" }}
@@ -87,7 +127,7 @@ export const ReferenceDocs: React.FC = () => {
             disabled={uploading}
           >
             <Plus size={16} />
-            <span>{uploading ? "Indexing Document..." : "Add Reference Document"}</span>
+            <span>{uploading ? "Indexing Documents..." : "Add Reference Document(s)"}</span>
           </button>
 
           <button
@@ -101,6 +141,50 @@ export const ReferenceDocs: React.FC = () => {
         </div>
       </div>
 
+      {/* Upload Progress Banner */}
+      {uploadProgress && (
+        <div
+          style={{
+            padding: 18,
+            borderRadius: "var(--radius-md)",
+            background: "linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(99, 102, 241, 0.08))",
+            border: "1px solid rgba(37, 99, 235, 0.25)",
+            marginBottom: 20,
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <UploadCloud size={18} color="#2563eb" className={uploadProgress.current < uploadProgress.total ? "animate-pulse" : ""} />
+              <span style={{ fontWeight: 700, color: "#1e293b", fontSize: "0.9rem" }}>
+                {uploadProgress.current < uploadProgress.total
+                  ? `Indexing: ${uploadProgress.currentFile}`
+                  : "Upload Complete!"}
+              </span>
+            </div>
+            <span style={{ fontWeight: 700, color: "#2563eb", fontSize: "0.85rem" }}>
+              {uploadProgress.current}/{uploadProgress.total} file{uploadProgress.total > 1 ? "s" : ""}
+              {" · "}
+              {Math.round((uploadProgress.current / uploadProgress.total) * 100)}%
+            </span>
+          </div>
+          <div style={{ height: 8, borderRadius: 4, background: "#e2e8f0", overflow: "hidden" }}>
+            <div
+              style={{
+                height: "100%",
+                borderRadius: 4,
+                background: "linear-gradient(90deg, #2563eb, #6366f1)",
+                width: `${(uploadProgress.current / uploadProgress.total) * 100}%`,
+                transition: "width 0.4s ease",
+              }}
+            />
+          </div>
+          {uploadProgress.failedFiles.length > 0 && (
+            <div style={{ marginTop: 8, fontSize: "0.8rem", color: "#dc2626" }}>
+              ⚠ Failed: {uploadProgress.failedFiles.join(", ")}
+            </div>
+          )}
+        </div>
+      )}
       {error && (
         <div
           style={{

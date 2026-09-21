@@ -12,6 +12,20 @@ const api = axios.create({
   timeout: 300_000, // 5 min — large documents take time
 });
 
+// Attach JWT token to every request
+api.interceptors.request.use((config) => {
+  const stored = localStorage.getItem("veritas_ai_token");
+  if (stored) {
+    try {
+      const { access_token } = JSON.parse(stored);
+      if (access_token) {
+        config.headers.Authorization = `Bearer ${access_token}`;
+      }
+    } catch { /* ignore parse errors */ }
+  }
+  return config;
+});
+
 // ─── Analysis ────────────────────────────────────────────────────────────────
 
 export async function analyzeFile(file: File, addToRepository = true): Promise<Analysis> {

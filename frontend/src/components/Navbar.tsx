@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { FileSearch, History, Database, Cpu } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { FileSearch, History, Database, Cpu, LogOut, UserCircle } from "lucide-react";
 import { healthCheck } from "../hooks/useApi";
+import { useAuth } from "../hooks/useAuth";
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [isHealthy, setIsHealthy] = useState<boolean | null>(null);
+  const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
 
   useEffect(() => {
     let mounted = true;
@@ -64,25 +68,27 @@ export const Navbar: React.FC = () => {
           </Link>
         </nav>
 
-        {/* Server Health Status */}
+        {/* Right side: status + user */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div
-            className="status-pill"
-            style={{
-              borderColor: isHealthy ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
-              background: isHealthy ? "rgba(16, 185, 129, 0.08)" : "rgba(239, 68, 68, 0.08)",
-              color: isHealthy ? "#059669" : "#dc2626",
-            }}
-          >
-            <span
-              className="status-dot"
+          {!isAuthPage && (
+            <div
+              className="status-pill"
               style={{
-                background: isHealthy ? "#10b981" : "#ef4444",
-                boxShadow: isHealthy ? "0 0 6px #10b981" : "0 0 6px #ef4444",
+                borderColor: isHealthy ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                background: isHealthy ? "rgba(16, 185, 129, 0.08)" : "rgba(239, 68, 68, 0.08)",
+                color: isHealthy ? "#059669" : "#dc2626",
               }}
-            />
-            <span>{isHealthy ? "Engine Online" : "Connecting..."}</span>
-          </div>
+            >
+              <span
+                className="status-dot"
+                style={{
+                  background: isHealthy ? "#10b981" : "#ef4444",
+                  boxShadow: isHealthy ? "0 0 6px #10b981" : "0 0 6px #ef4444",
+                }}
+              />
+              <span>{isHealthy ? "Engine Online" : "Connecting..."}</span>
+            </div>
+          )}
 
           <div
             title="Hybrid SBERT + TF-IDF Active"
@@ -101,6 +107,52 @@ export const Navbar: React.FC = () => {
             <Cpu size={14} color="#2563eb" />
             <span>Hybrid NLP</span>
           </div>
+
+          {/* User section */}
+          {user ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{
+                width: 34, height: 34, borderRadius: "50%",
+                background: "linear-gradient(135deg, #2563eb, #4f46e5)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#fff", fontWeight: 700, fontSize: "0.85rem",
+                cursor: "pointer", flexShrink: 0,
+                boxShadow: "0 2px 8px rgba(37,99,235,0.3)",
+              }} title={user.full_name}>
+                {user.full_name.charAt(0).toUpperCase()}
+              </div>
+              <button
+                onClick={() => { logout(); navigate("/login"); }}
+                title="Sign out"
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  background: "none", border: "1px solid #e2e8f0",
+                  borderRadius: 8, padding: "6px 10px",
+                  color: "#64748b", cursor: "pointer", fontSize: "0.8rem",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#ef4444"; (e.currentTarget as HTMLButtonElement).style.color = "#dc2626"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#e2e8f0"; (e.currentTarget as HTMLButtonElement).style.color = "#64748b"; }}
+              >
+                <LogOut size={13} />
+                <span>Sign out</span>
+              </button>
+            </div>
+          ) : !isAuthPage ? (
+            <Link
+              to="/login"
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                background: "linear-gradient(135deg, #2563eb, #4f46e5)",
+                color: "#fff", borderRadius: 8, padding: "7px 14px",
+                fontSize: "0.85rem", fontWeight: 600, textDecoration: "none",
+                boxShadow: "0 2px 8px rgba(37,99,235,0.3)",
+              }}
+            >
+              <UserCircle size={14} />
+              <span>Sign In</span>
+            </Link>
+          ) : null}
         </div>
       </div>
     </header>

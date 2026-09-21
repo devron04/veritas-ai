@@ -9,10 +9,11 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import Document, ReferenceChunk, get_session
+from app.models.database import Document, ReferenceChunk, User, get_session
+from app.routers.auth import get_current_user
 from app.schemas.schemas import DocumentListOut, DocumentOut
 from app.services.parser import extract_text
 from app.services.chunker import chunk_text
@@ -22,10 +23,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 
+def _sanitize_text(value: str | None) -> str | None:
+    """Strip null bytes that PostgreSQL rejects in text/varchar columns."""
+    if value is None:
+        return None
+    return value.replace("\x00", "")
+
+
 @router.post("", response_model=DocumentOut, status_code=201)
 async def upload_document(
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
+    current_user: User | None = Depends(get_current_user),
 ):
     """Upload a reference document to the corpus."""
     if not file.filename:
@@ -65,8 +74,9 @@ async def upload_document(
     doc = Document(
         filename=file.filename,
         content_hash=content_hash,
-        text_content=text,
+        text_content=_sanitize_text(text),
         word_count=len(text.split()),
+        owner_id=current_user.id if current_user else None,
     )
     session.add(doc)
     await session.flush()  # To get doc.id
@@ -76,12 +86,12 @@ async def upload_document(
     if chunks:
         chunk_texts = [c.text for c in chunks]
         embeddings = get_embeddings(chunk_texts)
-        
+
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
             ref_chunk = ReferenceChunk(
                 document_id=doc.id,
                 chunk_index=i,
-                text=chunk.text,
+                text=_sanitize_text(chunk.text),
                 embedding=emb
             )
             session.add(ref_chunk)
@@ -121,6 +131,7 @@ async def list_documents(
 async def delete_document(
     document_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
+    current_user: User | None = Depends(get_current_user),
 ):
     """Remove a reference document from the corpus."""
     result = await session.execute(
@@ -130,12 +141,13 @@ async def delete_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
 
+    # Only owner or admin can delete; anonymous users can delete any anonymous doc
+    if current_user and doc.owner_id and doc.owner_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="You can only delete your own documents.")
+
     doc_name = doc.filename
 
-    # Use SQL DELETE instead of session.delete() to avoid lazy-loading
-    # the 'chunks' backref in async context (MissingGreenlet error).
-    # The DB-level ON DELETE CASCADE handles ReferenceChunk cleanup.
-    from sqlalchemy import delete
+    # Use SQL DELETE to avoid lazy-loading the 'chunks' backref in async context.
     await session.execute(
         delete(ReferenceChunk).where(ReferenceChunk.document_id == document_id)
     )
@@ -145,4 +157,3 @@ async def delete_document(
     await session.commit()
     logger.info("Deleted reference document: '%s'.", doc_name)
     return {"detail": f"Document '{doc_name}' deleted."}
-

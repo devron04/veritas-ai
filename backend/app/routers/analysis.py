@@ -17,7 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
-from app.models.database import Analysis, Document, Finding, ReferenceChunk, get_session, async_session
+from app.models.database import Analysis, Document, Finding, ReferenceChunk, User, get_session, async_session
+from app.routers.auth import get_current_user
 from app.schemas.schemas import (
     AnalysisListOut, AnalysisOut, AnalysisStatusOut, AnalysisSummaryOut, TextInput,
 )
@@ -46,25 +47,29 @@ router = APIRouter(prefix="/api", tags=["analysis"])
 async def _load_reference_entries(
     session: AsyncSession,
     exclude_content_hash: str | None = None,
+    exclude_owner_id: uuid.UUID | None = None,
 ) -> list[ReferenceEntry]:
     """Load all reference document chunks from the database.
-    
+
     Args:
-        exclude_content_hash: If provided, skip the document with this content
-            hash.  This prevents a re-submitted document from matching against
-            its own earlier submission in the corpus.
+        exclude_content_hash: Skip the document whose content matches this hash
+            (prevents a re-submitted document matching its own prior submission).
+        exclude_owner_id: Skip all documents uploaded by this user ID
+            (prevents a user's own uploaded references inflating their score).
     """
     query = (
-        select(ReferenceChunk, Document.filename, Document.content_hash)
+        select(ReferenceChunk, Document.filename, Document.content_hash, Document.owner_id)
         .join(Document, ReferenceChunk.document_id == Document.id)
     )
     result = await session.execute(query)
     rows = result.all()
 
     entries: list[ReferenceEntry] = []
-    for ref_chunk, filename, content_hash in rows:
+    for ref_chunk, filename, content_hash, owner_id in rows:
         if exclude_content_hash and content_hash == exclude_content_hash:
-            continue  # skip self-match
+            continue  # skip self-match by content
+        if exclude_owner_id and owner_id and owner_id == exclude_owner_id:
+            continue  # skip documents uploaded by this user
         entries.append(ReferenceEntry(text=ref_chunk.text, source_name=filename))
 
     return entries
@@ -75,6 +80,7 @@ async def _run_analysis_background(
     text: str,
     filename: str,
     add_to_repository: bool = True,
+    user_id: uuid.UUID | None = None,
 ) -> None:
     """
     Background task: runs the full detection pipeline and updates progress in DB.
@@ -101,9 +107,14 @@ async def _run_analysis_background(
             analysis.total_chunks = len(input_chunks)
             await session.commit()
 
-            # Load reference corpus — exclude this document's own previous submission
+            # Load reference corpus — exclude this document's own content AND
+            # all documents uploaded by the scanning user (their own corpus uploads)
             submission_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
-            ref_entries = await _load_reference_entries(session, exclude_content_hash=submission_hash)
+            ref_entries = await _load_reference_entries(
+                session,
+                exclude_content_hash=submission_hash,
+                exclude_owner_id=user_id,
+            )
             logger.info(
                 "Analyzing '%s': %d chunks vs %d reference entries.",
                 filename, len(input_chunks), len(ref_entries),
@@ -239,6 +250,7 @@ async def _start_analysis(
     session: AsyncSession,
     background_tasks: BackgroundTasks,
     add_to_repository: bool = True,
+    user_id: uuid.UUID | None = None,
 ) -> Analysis:
     """Create the analysis record and schedule the background task."""
     analysis = Analysis(
@@ -247,6 +259,7 @@ async def _start_analysis(
         status="processing",
         progress=0.0,
         progress_message="Queued for analysis...",
+        user_id=user_id,
     )
     session.add(analysis)
     await session.commit()
@@ -259,6 +272,7 @@ async def _start_analysis(
         text,
         filename,
         add_to_repository,
+        user_id,
     )
 
     return analysis
@@ -273,6 +287,7 @@ async def analyze_file(
     file: UploadFile = File(...),
     add_to_repository: bool = Form(True),
     session: AsyncSession = Depends(get_session),
+    current_user: User | None = Depends(get_current_user),
 ):
     """Upload a file (.pdf, .docx, .txt) and run plagiarism analysis."""
     if not file.filename:
@@ -297,7 +312,9 @@ async def analyze_file(
         raise HTTPException(status_code=400, detail=str(e))
 
     analysis = await _start_analysis(
-        text, file.filename, session, background_tasks, add_to_repository=add_to_repository
+        text, file.filename, session, background_tasks,
+        add_to_repository=add_to_repository,
+        user_id=current_user.id if current_user else None,
     )
     return analysis
 
@@ -307,10 +324,13 @@ async def analyze_text(
     background_tasks: BackgroundTasks,
     payload: TextInput,
     session: AsyncSession = Depends(get_session),
+    current_user: User | None = Depends(get_current_user),
 ):
     """Submit text directly and run plagiarism analysis."""
     analysis = await _start_analysis(
-        payload.text, payload.filename, session, background_tasks, add_to_repository=payload.add_to_repository
+        payload.text, payload.filename, session, background_tasks,
+        add_to_repository=payload.add_to_repository,
+        user_id=current_user.id if current_user else None,
     )
     return analysis
 
