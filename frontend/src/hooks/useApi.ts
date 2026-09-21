@@ -95,6 +95,15 @@ export async function uploadReferenceDoc(
   return data;
 }
 
+export async function extractText(file: File): Promise<{ filename: string; text: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await api.post<{ filename: string; text: string }>("/documents/extract-text", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+
 export async function fetchDocuments(
   skip = 0,
   limit = 50

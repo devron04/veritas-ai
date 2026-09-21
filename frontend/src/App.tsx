@@ -1,43 +1,13 @@
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Navbar } from "./components/Navbar";
 import { FileUpload } from "./components/FileUpload";
 import { ResultsDashboard } from "./components/ResultsDashboard";
 import { AnalysisHistory } from "./components/AnalysisHistory";
 import { ReferenceDocs } from "./components/ReferenceDocs";
-import { LandingPage } from "./components/LandingPage";
 import { AuthModal } from "./components/AuthModal";
-import { AuthProvider, useAuth } from "./hooks/useAuth";
+import { AuthProvider } from "./hooks/useAuth";
 import "./styles/components.css";
-
-// ---------------------------------------------------------------------------
-// Protected Route — redirects to /login if not authenticated
-// ---------------------------------------------------------------------------
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
-  const location = useLocation();
-
-  if (loading) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: "50%",
-            border: "3px solid #e2e8f0", borderTopColor: "#2563eb",
-            animation: "spin 0.8s linear infinite", margin: "0 auto 16px",
-          }} />
-          <p style={{ color: "#64748b", fontSize: "0.9rem" }}>Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  return <>{children}</>;
-};
 
 // ---------------------------------------------------------------------------
 // Inner App (needs to be inside BrowserRouter to use useLocation)
@@ -50,14 +20,12 @@ const AppInner: React.FC = () => {
 
       <main style={{ flex: "1 0 auto" }}>
         <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<LandingPage />} />
-
-          {/* Protected routes */}
-          <Route path="/scan" element={<ProtectedRoute><FileUpload /></ProtectedRoute>} />
-          <Route path="/results/:id" element={<ProtectedRoute><ResultsDashboard /></ProtectedRoute>} />
-          <Route path="/history" element={<ProtectedRoute><AnalysisHistory /></ProtectedRoute>} />
-          <Route path="/references" element={<ProtectedRoute><ReferenceDocs /></ProtectedRoute>} />
+          {/* Main Application Routes */}
+          <Route path="/" element={<FileUpload />} />
+          <Route path="/scan" element={<FileUpload />} />
+          <Route path="/results/:id" element={<ResultsDashboard />} />
+          <Route path="/history" element={<AnalysisHistory />} />
+          <Route path="/references" element={<ReferenceDocs />} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

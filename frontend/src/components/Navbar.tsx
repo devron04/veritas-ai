@@ -1,29 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { FileSearch, History, Database, Cpu, LogOut, UserCircle } from "lucide-react";
-import { healthCheck } from "../hooks/useApi";
+import { FileSearch, History, Database, LogOut, UserCircle } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, openAuthModal } = useAuth();
-  const [isHealthy, setIsHealthy] = useState<boolean | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    const check = async () => {
-      const ok = await healthCheck();
-      if (mounted) setIsHealthy(ok);
-    };
-    check();
-    const interval = setInterval(check, 30000);
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, []);
 
   return (
     <>
@@ -47,12 +31,11 @@ export const Navbar: React.FC = () => {
           <nav className="nav-links">
             <Link
               to="/scan"
-              className={`nav-link ${location.pathname === "/scan" ? "active" : ""}`}
+              className={`nav-link ${location.pathname === "/scan" || location.pathname === "/" ? "active" : ""}`}
             >
               <FileSearch size={16} />
               <span>Scan Document</span>
             </Link>
-
             <Link
               to="/history"
               className={`nav-link ${location.pathname === "/history" ? "active" : ""}`}
@@ -163,7 +146,7 @@ export const Navbar: React.FC = () => {
                 onClick={() => {
                   setShowLogoutConfirm(false);
                   logout();
-                  navigate("/login");
+                  navigate("/");
                 }}
                 style={{
                   flex: 1, padding: "10px", borderRadius: "8px", background: "#2563eb",

@@ -176,6 +176,7 @@ async def _run_analysis_background(
                         content_hash=content_hash,
                         text_content=_sanitize_text(text),
                         word_count=len(text.split()),
+                        owner_id=user_id,
                     )
                     session.add(repo_doc)
                     await session.flush()

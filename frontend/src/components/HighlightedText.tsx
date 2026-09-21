@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { Finding } from "../types";
-import { getScoreColor, getMatchTypeLabel } from "../types";
+import { getScoreColor } from "../types";
 import { ShieldAlert, ExternalLink, ChevronLeft, ChevronRight, Quote } from "lucide-react";
 
 interface HighlightedTextProps {
@@ -72,12 +72,8 @@ export const HighlightedText: React.FC<HighlightedTextProps> = ({ text = "", fin
       let highlightClass = "hl-passage ";
       if (finding.is_quoted) {
         highlightClass += "hl-quoted";
-      } else if (finding.match_type === "exact") {
-        highlightClass += "hl-exact";
-      } else if (finding.match_type === "web") {
-        highlightClass += "hl-web";
       } else {
-        highlightClass += "hl-paraphrase";
+        highlightClass += "hl-exact"; // Red for all plagiarism
       }
 
       if (finding.id === selectedFindingId) {
@@ -85,9 +81,7 @@ export const HighlightedText: React.FC<HighlightedTextProps> = ({ text = "", fin
       }
 
       // Tooltip to explain *why*
-      let matchReason = "Paraphrased match";
-      if (finding.match_type === "exact") matchReason = "Exact match";
-      if (finding.match_type === "web") matchReason = "Web hit";
+      const matchReason = "Plagiarized match";
 
       elements.push(
         <mark
@@ -124,15 +118,7 @@ export const HighlightedText: React.FC<HighlightedTextProps> = ({ text = "", fin
           <div style={{ display: "flex", gap: 14, fontSize: "0.75rem" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--color-exact)" }} />
-              <span>Exact Match</span>
-            </span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--color-paraphrase)" }} />
-              <span>Paraphrase</span>
-            </span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--color-web)" }} />
-              <span>Web Hit</span>
+              <span>Plagiarized</span>
             </span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--color-quoted)" }} />
@@ -194,10 +180,11 @@ export const HighlightedText: React.FC<HighlightedTextProps> = ({ text = "", fin
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-                <span className={`badge badge-${selectedFinding.match_type}`}>
-                  {getMatchTypeLabel(selectedFinding.match_type)}
-                </span>
-                {selectedFinding.is_quoted && (
+                {!selectedFinding.is_quoted ? (
+                  <span className="badge badge-exact">
+                    Plagiarized Match
+                  </span>
+                ) : (
                   <span className="badge badge-quoted">
                     <Quote size={10} /> Cited Text
                   </span>

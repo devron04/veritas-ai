@@ -1,11 +1,11 @@
 import React, { useState, useRef } from "react";
 import { UploadCloud, FileText, Clipboard, Sparkles, AlertCircle, FileCheck, ArrowRight } from "lucide-react";
-import { analyzeFile, analyzeText } from "../hooks/useApi";
+import { analyzeFile, analyzeText, extractText } from "../hooks/useApi";
 import { ProgressOverlay } from "./ProgressOverlay";
-
-const SAMPLE_TEXT = `Artificial intelligence is rapidly transforming contemporary scientific inquiry and software development. In this study, we explore methods of modern natural language processing to benchmark automated plagiarism detection across academic literature. According to Vaswani et al. (2017), self-attention mechanisms allow models to compute representations of sequences without regard to their distance in input or output sequences. Machine learning algorithms, specifically deep neural networks, excel at capturing contextual semantic embeddings that surpass traditional lexical bag-of-words heuristics. However, improper attribution remains a persistent ethical dilemma in academia and creative industries alike.`;
+import { useAuth } from "../hooks/useAuth";
 
 export const FileUpload: React.FC = () => {
+  const { user, openAuthModal } = useAuth();
   const [activeTab, setActiveTab] = useState<"upload" | "paste">("upload");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pastedText, setPastedText] = useState<string>("");
@@ -23,7 +23,7 @@ export const FileUpload: React.FC = () => {
     }
   };
 
-  const validateAndSetFile = (file: File) => {
+  const validateAndSetFile = async (file: File) => {
     setErrorMsg(null);
     const validExtensions = [".pdf", ".docx", ".txt"];
     const ext = "." + file.name.split(".").pop()?.toLowerCase();
@@ -32,6 +32,14 @@ export const FileUpload: React.FC = () => {
       return;
     }
     setSelectedFile(file);
+    
+    try {
+      const result = await extractText(file);
+      setPastedText(result.text);
+      setActiveTab("paste");
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.detail || "Failed to extract text from document.");
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -51,14 +59,12 @@ export const FileUpload: React.FC = () => {
     }
   };
 
-  const handleLoadSample = () => {
-    setActiveTab("paste");
-    setPastedText(SAMPLE_TEXT);
-    setErrorMsg(null);
-  };
-
   const handleSubmit = async () => {
     setErrorMsg(null);
+    if (!user) {
+      openAuthModal('login');
+      return;
+    }
 
     if (activeTab === "upload") {
       if (!selectedFile) {
@@ -81,7 +87,8 @@ export const FileUpload: React.FC = () => {
       }
       try {
         setIsSubmitting(true);
-        const result = await analyzeText(pastedText, "direct_input.txt", addToRepository);
+        const filename = selectedFile ? selectedFile.name : "pasted_text.txt";
+        const result = await analyzeText(pastedText, filename, addToRepository);
         // Backend returns immediately with status="processing" — start polling
         setAnalysisId(result.id);
       } catch (err: any) {

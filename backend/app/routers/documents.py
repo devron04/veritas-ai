@@ -106,6 +106,31 @@ async def upload_document(
     return doc
 
 
+@router.post("/extract-text")
+async def extract_text_endpoint(file: UploadFile = File(...)):
+    """Extract and return text from an uploaded document without saving it."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided.")
+
+    allowed = {".pdf", ".docx", ".txt"}
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type: '{suffix}'. Allowed: {', '.join(allowed)}",
+        )
+
+    file_bytes = await file.read()
+    if len(file_bytes) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    try:
+        text = extract_text(file_bytes, file.filename)
+        return {"filename": file.filename, "text": text}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("", response_model=DocumentListOut)
 async def list_documents(
     skip: int = 0,
