@@ -42,11 +42,16 @@ def _get_embeddings_hf_api(texts: list[str]) -> np.ndarray:
                 logger.error(f"HF API Error {response.status_code}: {response.text}")
                 break
         except Exception as e:
-            logger.error(f"HF API Network Error: {e}")
-            break
+            logger.error(f"HF API Network Error on attempt {attempt + 1}: {e}")
+            if attempt < max_retries - 1:
+                logger.info("Retrying in 5 seconds...")
+                time.sleep(5)
+                continue
+            else:
+                break
             
-    logger.warning("HF API failed, falling back to local model loading.")
-    return _get_embeddings_local(texts)
+    logger.error("HF API completely failed after retries. Aborting to prevent OOM crash.")
+    raise RuntimeError("Hugging Face API is temporarily unavailable or DNS failed. Please try again later.")
 
 def _get_embeddings_local(texts: list[str], batch_size: int = 64) -> np.ndarray:
     model = get_embedding_model()
